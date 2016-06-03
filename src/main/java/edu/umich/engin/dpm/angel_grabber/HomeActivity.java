@@ -35,6 +35,7 @@ import android.app.Activity;
 import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 import android.view.animation.Animation;
 import android.view.animation.ScaleAnimation;
@@ -88,29 +89,29 @@ public class HomeActivity extends Activity {
         };
 
         if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            mGreenOpticalWaveformView = (GraphView) findViewById(R.id.graph_green);
-            mGreenOpticalWaveformView.setStrokeColor(0xffffffff);
-            mBlueOpticalWaveformView = (GraphView) findViewById(R.id.graph_blue);
-            mBlueOpticalWaveformView.setStrokeColor(0xffffffff);
+            mHRWaveformView = (GraphView) findViewById(R.id.graph_green);
+            mHRWaveformView.setStrokeColor(0xffffffff);
+            mRelHRWaveformView = (GraphView) findViewById(R.id.graph_blue);
+            mRelHRWaveformView.setStrokeColor(0xffffffff);
             mAccelerationWaveformView = (GraphView) findViewById(R.id.graph_acceleration);
             mAccelerationWaveformView.setStrokeColor(0xfff7a300);
-        }
 
-        mSensorDataHandler = new SensorDataHandlerToFile();
-        try {
-            mAccelerometerBuffer = new SensorBuffer(SensorType.ACCELEROMETER, 16, 64);
-            mHeartRateBuffer = new SensorBuffer(SensorType.HEARTRATE, 16, 8);
-            mHRWaveformBlueBuffer = new SensorBuffer(SensorType.HR_WAVEFORM_BLUE, 16, 8);
-            mHRWaveformGreenBuffer = new SensorBuffer(SensorType.HR_WAVEFORM_GREEN, 16, 8);
-        }
-        catch (InstantiationException ex) {
-            Toast.makeText(this, "Couldn't make buffers: instantiation exception", Toast.LENGTH_LONG);
-        }
-        catch (IllegalAccessException ex) {
-            Toast.makeText(this, "Couldn't make buffers: illegal access exception", Toast.LENGTH_LONG);
-        }
+            mSensorDataHandler = new SensorDataHandlerToFile();
+            try {
+                mAccelerometerBuffer = new SensorBuffer(SensorType.ACCELEROMETER, 16, 256);
+                mHeartRateBuffer = new SensorBuffer(SensorType.HEARTRATE, 8, 8);
+                mHRWaveformBlueBuffer = new SensorBuffer(SensorType.HR_WAVEFORM_BLUE, 16, 256);
+                mHRWaveformGreenBuffer = new SensorBuffer(SensorType.HR_WAVEFORM_GREEN, 16, 256);
+            }
+            catch (InstantiationException ex) {
+                Toast.makeText(this, "Couldn't make buffers: instantiation exception", Toast.LENGTH_LONG);
+            }
+            catch (IllegalAccessException ex) {
+                Toast.makeText(this, "Couldn't make buffers: illegal access exception", Toast.LENGTH_LONG);
+            }
 
-        mSensorDataHandler.onStreamStarted();
+            mSensorDataHandler.onStreamStarted();
+        }
     }
 
     protected void onStart() {
@@ -134,6 +135,9 @@ public class HomeActivity extends Activity {
             displaySignalStrength(0);
         }
         unscheduleUpdaters();
+        if (mHRWaveformView != null) {
+            mHRWaveformView.stopFillAtInterval();
+        }
         mBleDevice.disconnect();
     }
 
@@ -141,7 +145,9 @@ public class HomeActivity extends Activity {
     protected void onDestroy() {
         super.onDestroy();
 
-        mSensorDataHandler.onStreamStopped();
+        if (mSensorDataHandler != null) {
+            mSensorDataHandler.onStreamStopped();
+        }
     }
 
     private void connectGraphs(String deviceAddress) {
@@ -153,6 +159,7 @@ public class HomeActivity extends Activity {
 
         try {
             mBleDevice.registerServiceClass(SrvWaveformSignal.class);
+            mBleDevice.registerServiceClass(SrvHeartRate.class);
 
         } catch (NoSuchMethodException e) {
             throw new AssertionError();
@@ -197,9 +204,13 @@ public class HomeActivity extends Activity {
     private final BleDevice.LifecycleCallback mDeviceGraphLifecycleCallback = new BleDevice.LifecycleCallback() {
         @Override
         public void onBluetoothServicesDiscovered(BleDevice bleDevice) {
-            bleDevice.getService(SrvWaveformSignal.class).getAccelerationWaveform().enableNotifications(mAccelerationWaveformListener);
-            bleDevice.getService(SrvWaveformSignal.class).getOpticalWaveform().enableNotifications(mOpticalWaveformListener);
-            //bleDevice.getService(SrvHeartRate.class).getHeartRateMeasurement().enableNotifications(mHeartRateListener);
+            try {
+                bleDevice.getService(SrvWaveformSignal.class).getAccelerationWaveform().enableNotifications(mAccelerationWaveformListener);
+            } catch (AssertionError ex) { }
+            //bleDevice.getService(SrvWaveformSignal.class).getOpticalWaveform().enableNotifications(mOpticalWaveformListener);
+            try {
+                bleDevice.getService(SrvHeartRate.class).getHeartRateMeasurement().enableNotifications(mHeartRateListener);
+            } catch (AssertionError ex) { }
         }
 
         @Override
@@ -261,7 +272,9 @@ public class HomeActivity extends Activity {
             if (accelerationWaveformValue != null && accelerationWaveformValue.wave != null && mAccelerationWaveformView != null)
                 for (Integer item : accelerationWaveformValue.wave) {
                     mAccelerationWaveformView.addValue(item);
-                    mAccelerometerBuffer.recordReading(item, mSensorDataHandler);
+                    if (mAccelerometerBuffer != null) {
+                        mAccelerometerBuffer.recordReading(item, mSensorDataHandler);
+                    }
                 }
 
         }
@@ -272,10 +285,10 @@ public class HomeActivity extends Activity {
         public void onValueReady(ChOpticalWaveform.OpticalWaveformValue opticalWaveformValue) {
             if (opticalWaveformValue != null && opticalWaveformValue.wave != null)
                 for (ChOpticalWaveform.OpticalSample item : opticalWaveformValue.wave) {
-                    mGreenOpticalWaveformView.addValue(item.green);
-                    mBlueOpticalWaveformView.addValue(item.blue);
-                    mHRWaveformGreenBuffer.recordReading(item.green, mSensorDataHandler);
-                    mHRWaveformBlueBuffer.recordReading(item.blue, mSensorDataHandler);
+                    if (mHRWaveformBlueBuffer != null && mHRWaveformGreenBuffer != null) {
+                        mHRWaveformGreenBuffer.recordReading(item.green, mSensorDataHandler);
+                        mHRWaveformBlueBuffer.recordReading(item.blue, mSensorDataHandler);
+                    }
                 }
         }
     };
@@ -284,8 +297,17 @@ public class HomeActivity extends Activity {
         @Override
         public void onValueReady(final ChHeartRateMeasurement.HeartRateMeasurementValue hrMeasurement) {
             int hr = hrMeasurement.getHeartRateMeasurement();
+            Log.d("HomeActivity", "Heart rate: " + hr + " bpm");
             displayHeartRate(hr);
-            mHeartRateBuffer.recordReading(hr, mSensorDataHandler);
+            if (mHRWaveformView != null && mRelHRWaveformView != null) {
+                mHRWaveformView.fillAtInterval(200);
+                mRelHRWaveformView.fillAtInterval(200);
+                mHRWaveformView.addValue((float)(hr));
+                mRelHRWaveformView.addValue(relativeHeartrate(hr));
+            }
+            if (mHeartRateBuffer != null) {
+                mHeartRateBuffer.recordReading(hr, mSensorDataHandler);
+            }
         }
     };
 
@@ -323,15 +345,17 @@ public class HomeActivity extends Activity {
 
     private void displayHeartRate(final int bpm) {
         TextView textView = (TextView)findViewById(R.id.textview_heart_rate);
-        textView.setText(bpm + " bpm");
+        if (textView != null) {
+            textView.setText(bpm + " bpm");
 
-        ScaleAnimation effect =  new ScaleAnimation(1f, 0.5f, 1f, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
-        effect.setDuration(ANIMATION_DURATION);
-        effect.setRepeatMode(Animation.REVERSE);
-        effect.setRepeatCount(1);
+            ScaleAnimation effect = new ScaleAnimation(1f, 0.5f, 1f, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+            effect.setDuration(ANIMATION_DURATION);
+            effect.setRepeatMode(Animation.REVERSE);
+            effect.setRepeatCount(1);
 
-        View heartView = findViewById(R.id.imageview_heart);
-        heartView.startAnimation(effect);
+            View heartView = findViewById(R.id.imageview_heart);
+            heartView.startAnimation(effect);
+        }
     }
 
     private void displaySignalStrength(int db) {
@@ -432,6 +456,13 @@ public class HomeActivity extends Activity {
         displayBatteryLevel(0);
     }
 
+    private float relativeHeartrate(int hrWorking) {
+        if (mMinHR == 0 || hrWorking < mMinHR) {
+            mMinHR = hrWorking;
+        }
+        return 100f * (hrWorking - mMinHR) / (220f - mUserAge - mMinHR);
+    }
+
     private void scheduleUpdaters() {
         mHandler.post(mPeriodicReader);
     }
@@ -445,7 +476,7 @@ public class HomeActivity extends Activity {
 
     private int orientation;
 
-    private GraphView mAccelerationWaveformView, mBlueOpticalWaveformView, mGreenOpticalWaveformView;
+    private GraphView mAccelerationWaveformView, mRelHRWaveformView, mHRWaveformView;
 
     private BleDevice mBleDevice;
     private String mBleDeviceAddress;
@@ -460,4 +491,7 @@ public class HomeActivity extends Activity {
     private SensorBuffer mHeartRateBuffer;
     private SensorBuffer mHRWaveformBlueBuffer;
     private SensorBuffer mHRWaveformGreenBuffer;
+
+    private int mUserAge = 30;
+    private int mMinHR = 0;
 }

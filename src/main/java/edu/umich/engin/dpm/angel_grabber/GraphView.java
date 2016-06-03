@@ -63,6 +63,10 @@ public class GraphView extends View {
     private float minValue = 0f;
     private float maxValue = 1f;
 
+    private boolean runFillThread = false;
+    private float currValue = 0f;
+    private float nextValue = 0f;
+
         public GraphView(Context context) {
         super(context);
         initView();
@@ -138,7 +142,40 @@ public class GraphView extends View {
         this.strokeWidth = dp;
     }
 
-    public void addValue(float value) {
+    public void fillAtInterval(final int millis) {
+        if (!runFillThread) {
+            runFillThread = true;
+            final double incr = 500.0 / millis;
+            new Thread() {
+                @Override
+                public void run() {
+                    while (runFillThread) {
+                        if (currValue < nextValue) {
+                            currValue += incr;
+                        }
+                        else if (nextValue < currValue) {
+                            currValue -= incr;
+                        }
+                        addValue(currValue);
+                        try {
+                            sleep(millis);
+                        }
+                        catch (InterruptedException ex) { }
+                    }
+                }
+            }.start();
+        }
+    }
+
+    public void stopFillAtInterval() {
+        runFillThread = false;
+    }
+
+    public synchronized void addValue(float value) {
+        nextValue = value;
+        if (currValue == 0.0) {
+            currValue = value;
+        }
 
         if (value > maxValue) maxValue = value;
         if (value < minValue) minValue = value;
@@ -154,7 +191,7 @@ public class GraphView extends View {
         valuesCache.add(value);
         currentValuesCache = cloneCache();
         calculateScales();
-        invalidate();
+        this.postInvalidate();
     }
 
     public void clear() {

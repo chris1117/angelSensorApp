@@ -4,6 +4,7 @@ import android.util.Log;
 
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Hashtable;
@@ -18,6 +19,11 @@ public class SensorDataHandlerToFile implements SensorDataHandler {
     private static final String TAG = "SensorDataHandlerToFile";
 
     private final Hashtable<SensorType, FileHandler> mFileHandlers = new Hashtable<SensorType, FileHandler>(5);
+    private volatile ArrayList<SensorQueue> mProducerQueue = new ArrayList<SensorQueue>();
+    private volatile ArrayList<SensorQueue> mConsumerQueue = new ArrayList<SensorQueue>();
+
+    private volatile boolean mIsRunning = false;
+    private ConsumerThread mThread;
 
     private String mFileNamePrefix = "";
     private Date mSessionStartTime;
@@ -29,11 +35,17 @@ public class SensorDataHandlerToFile implements SensorDataHandler {
 
         mSessionStartTime = Calendar.getInstance().getTime();
         mFileNamePrefix = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss").format(mSessionStartTime);
+
+        mIsRunning = true;
+        mThread = new ConsumerThread();
+        mThread.start();
     }
 
     @Override
     public void onStreamStopped() {
         Log.d(TAG, "onStreamStopped");
+
+        mIsRunning = false;
 
         for (FileHandler handler : mFileHandlers.values()) {
             handler.close();
@@ -43,7 +55,16 @@ public class SensorDataHandlerToFile implements SensorDataHandler {
 
     @Override
     public void receiveData(SensorQueue queue) {
-        Log.d(TAG, "Received queue");
+        synchronized (mProducerQueue) {
+            mProducerQueue.add(queue);
+        }
+        synchronized (mThread) {
+            mThread.notify();
+        }
+    }
+
+    public void writeData(SensorQueue queue) {
+        Log.d(TAG, "Queueing");
 
         Log.d(TAG, "Writing queue w/ starting timestamp = " + String.valueOf(queue.getReadings()[0].getTimestamp()));
         SensorType sensor = queue.getSensorType();
@@ -63,6 +84,8 @@ public class SensorDataHandlerToFile implements SensorDataHandler {
         }
     }
 
+
+
     public static String sensorStringId(SensorType sensor) {
         switch (sensor) {
             case ACCELEROMETER:      return "Accelerometer";
@@ -78,5 +101,32 @@ public class SensorDataHandlerToFile implements SensorDataHandler {
 
     private String makeFileName(SensorType sensor) {
         return mFileNamePrefix + "_" + sensorStringId(sensor);
+    }
+
+
+    private class ConsumerThread extends Thread {
+        @Override
+        public void run() {
+            while (mIsRunning) {
+                synchronized (this) {
+                    while (mProducerQueue.isEmpty()) {
+                        try {
+                            wait();
+                        } catch (InterruptedException ex) { }
+                    }
+                }
+
+                synchronized (mProducerQueue) {
+                    ArrayList<SensorQueue> temp = mProducerQueue;
+                    mProducerQueue = mConsumerQueue;
+                    mConsumerQueue = temp;
+                }
+
+                for (SensorQueue q : mConsumerQueue) {
+                    writeData(q);
+                }
+                mConsumerQueue.clear();
+            }
+        }
     }
 }
