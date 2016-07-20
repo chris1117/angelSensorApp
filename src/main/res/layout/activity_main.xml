@@ -3,7 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_gravity="center"
-    tools:context=".MainActivity"
+    tools:context=".HomeActivity"
                 android:background="@drawable/ic_home_background">
 
     <RelativeLayout
@@ -28,25 +28,67 @@
         android:text="@string/scan"
         android:textColor="@color/angel_gold_color"
         android:textSize="22sp" />
+
+
     <View
         android:id="@+id/sepControlBottom"
         android:layout_width="match_parent"
         android:layout_alignParentBottom="true"
         android:layout_height="2dp"
         android:background="@color/angel_gold_color" />
-    
-    
     </RelativeLayout>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textAppearance="?android:attr/textAppearanceLarge"
-        android:text="@string/scan_welcome"
+        android:text="Welcome to Angel Sensor! Please select your AGE and press the Angel's button once to reactivate Bluetooth and tap SCAN"
         android:id="@+id/textView"
-        android:layout_alignParentTop="false"
-        android:layout_marginTop="90dp"
         android:textColor="@color/angel_gold_color"
         android:gravity="center"
-        android:layout_centerVertical="true"/>
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true" />
+
+    <TextView
+        android:id="@+id/textView1"
+        android:textSize="20dp"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="156dp"
+        android:text="AGE SELECTOR"
+        android:textColor="@android:color/holo_orange_dark"
+        android:layout_above="@+id/control" />
+
+    <NumberPicker
+        android:id="@+id/numberPicker1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:solidColor="@android:color/holo_orange_dark" />
+
+    <!--<TextView
+        android:id="@+id/textView2"
+        android:textSize="18dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/numberPicker1"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="25dp"
+        android:text="Old Value : "
+        android:textColor="@android:color/holo_orange_dark" />
+
+    <TextView
+        android:id="@+id/textView3"
+        android:textSize="18dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/textView2"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="25dp"
+        android:layout_marginBottom="25dp"
+        android:text="New Value : "
+        android:textColor="@android:color/holo_orange_dark" />
+        -->
 </RelativeLayout>

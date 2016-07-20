@@ -32,7 +32,17 @@
 package edu.umich.engin.dpm.angel_grabber;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.TaskStackBuilder;
+import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
+import android.graphics.Color;
+import android.media.RingtoneManager;
+import android.net.Uri;
+import android.support.v4.app.NoticationManagerCompat;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -65,6 +75,7 @@ import edu.umich.engin.dpm.angel_grabber.data.SensorDataHandler;
 import edu.umich.engin.dpm.angel_grabber.data.SensorDataHandlerToFile;
 import edu.umich.engin.dpm.angel_grabber.sensor.SensorBuffer;
 import edu.umich.engin.dpm.angel_grabber.sensor.SensorType;
+import edu.umich.engin.dpm.angel_grabber.stream.NotificationActivity;
 
 public class HomeActivity extends Activity {
 
@@ -120,6 +131,7 @@ public class HomeActivity extends Activity {
         Bundle extras = getIntent().getExtras();
         assert(extras != null);
         mBleDeviceAddress = extras.getString("ble_device_address");
+        mUserAge = extras.getInt("age");
 
         if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
             connectGraphs(mBleDeviceAddress);
@@ -210,7 +222,10 @@ public class HomeActivity extends Activity {
             //bleDevice.getService(SrvWaveformSignal.class).getOpticalWaveform().enableNotifications(mOpticalWaveformListener);
             try {
                 bleDevice.getService(SrvHeartRate.class).getHeartRateMeasurement().enableNotifications(mHeartRateListener);
-            } catch (AssertionError ex) { }
+                Log.d("xyz", "one fish"); //testing to see if it can be found in code
+            } catch (AssertionError ex) {
+                Log.d("xyz", "two fish");  //testing to see if it can be found in code
+            }
         }
 
         @Override
@@ -297,7 +312,36 @@ public class HomeActivity extends Activity {
         @Override
         public void onValueReady(final ChHeartRateMeasurement.HeartRateMeasurementValue hrMeasurement) {
             int hr = hrMeasurement.getHeartRateMeasurement();
-            Log.d("HomeActivity", "Heart rate: " + hr + " bpm");
+
+            Uri sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+
+            if(hr >= 220 - mUserAge) {
+
+                NotificationCompat.Builder builder = new NotificationCompat.Builder (getApplicationContext());
+                builder.setContentTitle("HR WARNING").setContentText("Maximum HR exceeded")
+                        .setSmallIcon(R.drawable.heart_icon).setLights(Color.BLUE, 500, 500)
+                        .setVibrattion(new long[] {500, 500, 500, 500}).setSound(sound)
+                        .setAutoCancel(true);
+
+                Intent intent = new Intent(getApplicationContext(), NotificationActivity.class);
+                intent.putExtra("%HRR", hr);
+
+                TaskStackBuilder stackBuilder = TaskStackBuilder.create(getApplicationContext());
+                stackBuilder.addParentStack(NotificationActivity.class)
+                            .addNextIntent(intent);
+
+                PendingIntent pendingIntent = stackBuilder.getPendingIntent(0, PendingIntent.FLAG_UPDATE_CURRENT);
+                builder.setContentIntent(pendingIntent);
+
+                NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                notificationManager.notify(0, builder.build());
+
+
+                //CharSequence toastHR = "max threshold reached: " + hr;  //Displays a pop-up for the threshold read
+                //Toast t = Toast.makeText(getApplicationContext(), toastHR, Toast.LENGTH_LONG);
+                //t.show();
+            }
+
             displayHeartRate(hr);
             if (mHRWaveformView != null && mRelHRWaveformView != null) {
                 mHRWaveformView.fillAtInterval(200);
@@ -331,6 +375,13 @@ public class HomeActivity extends Activity {
         new BleCharacteristic.ValueReadyCallback<ChStepCount.StepCountValue>() {
             @Override
             public void onValueReady(final ChStepCount.StepCountValue stepCountValue) {
+                Log.d("xyz", "red fish");
+
+                /*Toast t = Toast.makeText(getApplicationContext(), "bye", Toast.LENGTH_LONG);
+                t.show();
+                *
+                */
+
                 displayStepCount(stepCountValue.value);
             }
         };
@@ -471,7 +522,7 @@ public class HomeActivity extends Activity {
         mHandler.removeCallbacks(mPeriodicReader);
     }
 
-    private static final int RSSI_UPDATE_INTERVAL = 1000; // Milliseconds
+    private static final int RSSI_UPDATE_INTERVAL = 10; // Milliseconds
     private static final int ANIMATION_DURATION = 500; // Milliseconds
 
     private int orientation;
@@ -492,6 +543,6 @@ public class HomeActivity extends Activity {
     private SensorBuffer mHRWaveformBlueBuffer;
     private SensorBuffer mHRWaveformGreenBuffer;
 
-    private int mUserAge = 30;
+    private int mUserAge = 0;
     private int mMinHR = 0;
 }

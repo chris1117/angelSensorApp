@@ -39,13 +39,16 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.os.Bundle;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ListView;
+import android.widget.NumberPicker;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.angel.sdk.BleScanner;
 import com.angel.sdk.BluetoothInaccessibleException;
@@ -62,6 +65,9 @@ public class ScanActivity extends Activity implements OnClickListener {
     private static final int IDLE = 0;
     private static final int SCANNING = 1;
     private static final int CONNECTED = 2;
+
+    NumberPicker np;
+    TextView tv1, tv2;
 
     private BleScanner mBleScanner;
     private RelativeLayout mControl;
@@ -100,6 +106,35 @@ public class ScanActivity extends Activity implements OnClickListener {
         mControlAction = (TextView) findViewById(R.id.controlAction);
 
         mDeviceListAdapter = new ListItemsAdapter(this, R.layout.list_item);
+
+        np = (NumberPicker) findViewById(R.id.numberPicker1);
+        //tv1 = (TextView) findViewById(R.id.textView2);
+        //tv2 = (TextView) findViewById(R.id.textView3);
+
+        np.setMinValue(18);
+        np.setMaxValue(150);
+        np.setWrapSelectorWheel(false);
+
+        for (int i = 0; i <= 1; i++) {
+            Toast toast = Toast.makeText(getApplicationContext(), "Your Maximum HR is "
+                    + (220 - np.getValue()), Toast.LENGTH_LONG);
+            toast.show();
+        }
+
+        /*np.setOnValueChangedListener(new NumberPicker.OnValueChangeListener() {
+            @Override
+            public void onValueChange(NumberPicker picker, int oldVal, int newVal) {
+
+                String Old = "Old Value : ";
+                String New = "New Value : ";
+
+                tv1.setText(Old.concat(String.valueOf(oldVal)));
+                tv2.setText(New.concat(String.valueOf(newVal)));
+
+                //Intent intent = new Intent(np.getContext(), MainActivity.class);
+                //intent.putExtra("number_Selector", np.getValue());
+            }
+        });*/
     }
 
 
@@ -201,6 +236,7 @@ public class ScanActivity extends Activity implements OnClickListener {
                 Assert.assertTrue(bluetoothDevice != null);
                 Intent intent = new Intent(parent.getContext(), HomeActivity.class);
                 intent.putExtra("ble_device_address", bluetoothDevice.getAddress());
+                intent.putExtra("age", np.getValue());
                 startActivity(intent);
             }
         });
@@ -218,4 +254,5 @@ public class ScanActivity extends Activity implements OnClickListener {
         super.onStop();
         stopScan();
     }
+
 }
